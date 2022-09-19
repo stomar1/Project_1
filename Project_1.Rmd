@@ -1,0 +1,308 @@
+---
+title: "Project_1"
+output: html_document
+date: "2022-09-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+{r echo=TRUE}
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("tidytuesdayR")
+tuesdata <- tidytuesdayR::tt_load('2022-01-18')
+chocolate <- tuesdata$chocolate
+library(here)
+library(tidyverse)
+```
+
+```{r}
+if(!dir.exists(here("data"))) { dir.create(here("data")) }
+if(!file.exists(here("data","chocolate.RDS"))) {
+  url_csv <- 'https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-18/chocolate.csv'
+  chocolate <- readr::read_csv(url_csv)
+  
+  # save the file to RDS objects
+  saveRDS(chocolate, file= here("data","chocolate.RDS"))
+}
+chocolate <- readRDS(here("data","chocolate.RDS"))
+as_tibble(chocolate)
+
+glimpse(chocolate)
+```
+
+
+
+
+
+###Part 1
+##1. Making a histogram of rating score.
+
+hist(chocolate$rating)
+hist(chocolate$rating, breaks=15)
+hist(chocolate$rating, breaks=10)
+hist(chocolate$rating, breaks=15)
+hist(chocolate$rating, breaks=20)
+hist(chocolate$rating, breaks=25)
+
+#I would go with bin= 10 as it removes gaps and helps me to better visualize histogram
+
+##2. Reviews rating to each countries bean origin
+rat_origin <- group_by(chocolate, country_of_bean_origin)
+rat_origin1 <- summarize(rat_origin, count= n())
+
+rat_origin2 <- as_tibble(rat_origin1)
+str(rat_origin2)
+
+##3. Ecuador rating
+ecu<- chocolate[chocolate$country_of_bean_origin %in% c("Ecuador"),]
+
+ecu1<- group_by(ecu,country_of_bean_origin ) %>% 
+  summarize(total= n(), mean= mean(rating, na.rm=TRUE), sd= sd(rating, na.rm= TRUE))
+  
+##4. Best chocolate with beans from Ecuador
+best<- group_by(ecu, company_location) %>%
+   summarize (total= n(), avgrat = mean(rating, na.rm = TRUE))
+best1<- best %>% filter(avgrat== max(avgrat, na.rm=TRUE))
+
+##5. Top 3 countries across all country of origins for beans
+
+top_3_countries <- group_by(chocolate, country_of_bean_origin) %>%
+ summarise(total= n(), avg= mean(rating, na.rm=TRUE)) %>% 
+ arrange(desc(avg)) %>%
+ slice(1:3)
+ 
+ 
+# Top 3 countires Tobago > China > Sao Tome & Principe
+
+##6. Chocolate by review <10
+
+#Filter such that countries with <10 reviews were removed
+top <- group_by(chocolate, country_of_bean_origin) %>%
+    summarise(total= n(), avg= mean(rating, na.rm=TRUE))
+    
+top_r_10<- filter(top, total < 10) %>% 
+    arrange(desc(top_r_10$avg)) %>%
+    slice(1:3)
+
+#Top 3 countries remains the same 
+
+##7. Relationship between % chocolate and rating ???
+#Removing countries with <50 review
+group_by( chocolate, country_of_bean_origin, rating) %>%
+       summarise(number = length(rating)) %>%
+        filter(number >= 50) %>%
+        head()
+        
+dat <- select(chocolate, cocoa_percent, rating, country_of_bean_origin)
+dat$first2 <- substring(dat$cocoa_percent, first = 1, last = 2)
+dat <- mutate(dat, group_choc = case_when(
+                first2 < 60 ~ "<60%",
+                first2 >= 60 & first2 < 70 ~ "60-69%",
+                first2 >= 70 & first2 < 90 ~ "70-89%",
+                first2 >= 90 ~ ">=90%"
+        ))
+dat$group_choc <- factor(dat$group_choc, levels = c("<60%", "60-69%", "70-89%", ">=90%"))
+
+dat <- dat[order(dat$group_choc)]
+
+plot <- ggplot(dat, aes(x=factor(group_choc), y=rating)) +
+        geom_boxplot() +
+        theme(legend.position = "none") +
+        labs(title = "Chocolate Review Study")
+        
+
+###Part 2
+#Joining gapminder continent column
+joined_tibble<- chocolate %>% left_join(gapminder, by= c("country_of_bean_origin"= "country"), copy= TRUE)
+
+
+#removing <10 reviews
+joined_tibble2 <- group_by(joined_tibble,country_of_bean_origin, rating, continent) %>%   summarise(total= n()) 
+
+#filter n>= 10 and remove blend
+jt_more10wB <- filter(joined_tibble2, country_of_bean_origin != "Blend", total >=10)
+ 
+#voilen plot
+p <- ggplot(jt_more10wB, aes(x=continent, y=rating)) + 
+     geom_violin(trim= FALSE)
+#Print p
+p + geom_boxplot(width=0.1)
+
+###Part 3
+##1. Ingredients
+#Creating new column for beans
+chocolate$beans <- str_detect(chocolate$ingredients, "B")
+#Checking if beans are present or not
+chocolate$beans <- as.integer(chocolate$beans)
+#replacing NA in dataframe
+chocolate$beans[is.na(chocolate$beans)] <- 0
+summary(chocolate$beans)
+
+#Creating new column for cocoa butter and replacing
+chocolate$cocoa <- str_detect(chocolate$ingredients, "C")
+chocolate$cocoa <- as.integer(chocolate$cocoa)
+chocolate$cocoa[is.na(chocolate$cocoa)] <- 0
+summary(chocolate$cocoa)
+
+
+#Creating new column for sugar and replacing
+chocolate$sugar <- str_detect(chocolate$ingredients, "S")
+chocolate$sugar <- as.integer(chocolate$sugar)
+chocolate$sugar[is.na(chocolate$sugar)] <- 0
+summary(chocolate$sugar)
+
+
+#Creating new column for Vanilla and replacing
+chocolate$vanilla <- str_detect(chocolate$ingredients, "V")
+chocolate$vanilla <- as.integer(chocolate$vanilla)
+#replacing NA in dataframe
+chocolate$vanilla[is.na(chocolate$vanilla)] <- 0
+summary(chocolate$vanilla)
+
+#creating new column for letchin and replacing 
+chocolate$letchin <- str_detect(chocolate$ingredients, "L")
+chocolate$letchin <- as.integer(chocolate$letchin)
+chocolate$letchin[is.na(chocolate$letchin)] <- 0
+summary(chocolate$letchin)
+
+#creating new column for salt and replacing 
+chocolate$salt <- str_detect(chocolate$ingredients, "Sa")
+chocolate$salt <- as.integer(chocolate$salt)
+chocolate$salt[is.na(chocolate$salt)] <- 0
+summary(chocolate$salt)
+
+##2. Characteristic 
+#creating new column for char_cocoa
+chocolate$char_cocoa <- str_detect(chocolate$most_memorable_characteristics, "cocoa")
+
+chocolate$char_cocoa <- case_when(chocolate$char_cocoa == "TRUE" ~ "1", TRUE ~ "0")
+chocolate$char_cocoa <- as.integer(chocolate$char_cocoa)
+summary(chocolate$char_cocoa)
+
+#creating new column for char_sweet
+chocolate$char_sweet <- str_detect(chocolate$most_memorable_characteristics, "sweet")
+
+chocolate$char_sweet <- case_when(chocolate$char_sweet == "TRUE" ~ "1", TRUE ~ "0")
+chocolate$char_sweet <- as.integer(chocolate$char_sweet)
+summary(chocolate$char_sweet)
+
+#Wont work 
+#chocolate$char_sweet <- str_detect(chocolate$most_memorable_characteristics, "sweet") %>%
+#case_when(chocolate$char_sweet == "TRUE" ~ "1", TRUE ~ "0") %>%
+#as.integer(chocolate$char_sweet) %>%
+
+#creating new column for char_nutty
+chocolate$char_nutty <- str_detect(chocolate$most_memorable_characteristics, "nutty")
+
+chocolate$char_nutty <- case_when(chocolate$char_nutty == "TRUE" ~ "1", TRUE ~ "0")
+chocolate$char_nutty <- as.integer(chocolate$char_nutty)
+summary(chocolate$char_nutty)
+
+
+#creating new column for char_creamy
+chocolate$char_creamy <- str_detect(chocolate$most_memorable_characteristics, "creamy")
+
+chocolate$char_creamy <- case_when(chocolate$char_creamy == "TRUE" ~ "1", TRUE ~ "0")
+chocolate$char_creamy <- as.integer(chocolate$char_creamy)
+summary(chocolate$char_creamy)
+
+#creating new column for char_roasty
+chocolate$char_roasty <- str_detect(chocolate$most_memorable_characteristics, "roasty")
+
+chocolate$char_roasty <- case_when(chocolate$char_roasty == "TRUE" ~ "1", TRUE ~ "0")
+chocolate$char_roasty <- as.integer(chocolate$char_roasty)
+summary(chocolate$char_roasty)
+
+#creating new column for char_earthy
+chocolate$char_earthy <- str_detect(chocolate$most_memorable_characteristics, "earthy")
+
+chocolate$char_earthy <- case_when(chocolate$char_earthy == "TRUE" ~ "1", TRUE ~ "0")
+chocolate$char_earthy <- as.integer(chocolate$char_earthy)
+summary(chocolate$char_earthy)
+
+##3.  
+review_data <- chocolate %>% select(c(review_date, beans, cocoa, sugar, vanilla, letchin, salt, char_cocoa, char_sweet, char_earthy, char_roasty, char_creamy, char_nutty))
+    
+ans3 <- review_data %>% group_by(review_date) %>% 
+    summarize_at(vars(beans:char_nutty), mean, na.rm =TRUE) 
+##4. 
+ans3_pivot<- ans3 %>% pivot_longer(-review_date, names_to= "feature", values_to= "mean_score")
+
+###Part 4
+p <- qplot(x= review_date, y= mean_score, data= ans3_pivot, color = factor(feature), geom = c("point", "smooth"), xlab= "Time", ylab= "Mean Score", main = "Scatterplot mean score over time")
+p + theme(plot.title = element_text(face = "bold", hjust = 0.5)) + labs(subtitle= "coco beans were most commonly used and remained same over time while use of vanilla reduced over years.",
+caption = "Shubham Tomar")
+
+###Part 5
+wp<- ecu %>% ggplot(aes(x= as.factor(review_date), y= rating)) + geom_violin() + geom_violin(draw_quantiles = c(.25, .50, .75)) + geom_violin(width=1.4) +
+    geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("Rating over time") +
+    xlab("") + ylab("") +
+    geom_violin(aes(fill= factor(rating))) +
+    theme(
+    text = element_text(family = "Roboto", size = 8, color = "black"),
+    plot.title = element_text(
+      family = "Lobster Two", 
+      size = 180,
+      face = "bold",
+      color = "#2a475e"
+    ))
+wp
+
+#Not a good plot because
+#1. Big title, out of scale
+#2. No legend
+#3. No axis title
+#4. No subtitle or information 
+#5. Grayscale / colour scheme 
+#6. Bins 
+#7. Font sizes
+
+
+###Part 6
+
+#generate voilen plot
+imp<- chocolate %>% ggplot(aes(x = as.factor(review_date),  y = rating))
+
+#1. Flip side
+imp + geom_violin() + coord_flip()
+
+#2. Add quintiles 
+imp +geom_violin() + coord_flip() + geom_violin(draw_quantiles = c(.25, .50, .75))
+
+#3. Add colour
+imp +geom_violin() + coord_flip() + geom_violin(draw_quantiles = c(.25, .50, .75)) + geom_violin(aes(fill= factor(review_date)))
+
+#4. Add summary mean
+imp +geom_violin() + coord_flip() + geom_violin(draw_quantiles = c(.25, .50, .75)) + geom_violin(aes(fill= factor(review_date))) +stat_summary(fun="mean", geom="point", size=1, color="black")
+
+#5. Add title 
+imp +geom_violin() + coord_flip() + geom_violin(draw_quantiles = c(.25, .50, .75)) + geom_violin(aes(fill= factor(review_date))) + stat_summary(fun="mean", geom="point", size=1, color="black") + labs(title="Rating over time")
+
+#6. Adding labels
+imp +geom_violin() + coord_flip() + geom_violin(draw_quantiles = c(.25, .50, .75)) + geom_violin(aes(fill= factor(review_date))) + stat_summary(fun="mean", geom="point", size=1, color="black") + xlab("Rating") +
+ylab("Time")
+
+#7. Background
+
+imp +geom_violin() + coord_flip() + geom_violin(draw_quantiles = c(.25, .50, .75)) + geom_violin(aes(fill= factor(review_date))) + stat_summary(fun="mean", geom="point", size=1, color="black") + xlab("Rating") +
+ylab("Time") + theme(plot.background = element_rect(fill = "#fbf9f4", color = "#fbf9f4"))
+
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
